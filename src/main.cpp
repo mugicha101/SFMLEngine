@@ -4,8 +4,7 @@
 
 #include "../src/input.cpp"
 
-int main()
-{
+int main() {
     // setup window
     auto window = sf::RenderWindow{ { 1280, 960 }, "CMake SFML Project" };
     window.setFramerateLimit(60);
@@ -42,7 +41,13 @@ int main()
         Input::inputTick();
 
         // move player
+
+        // clear window
         window.clear(sf::Color(255, 0, 0));
+
+        // display player
+
+        // display window
         window.display();
     }
 }
