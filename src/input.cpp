@@ -5,13 +5,12 @@
 
 class Input {
 private:
-	static Input nullInput;
 	inline static std::unordered_map<std::string, Input> idInputMap;
 	inline static std::unordered_map<sf::Keyboard::Key, Input*> keyInputMap;
 	inline static std::vector<std::pair<sf::Keyboard::Key, bool>> events;
 
 	static Input& get(std::string id) {
-		return idInputMap.count(id) == 0 ? idInputMap[id] : nullInput;
+		return idInputMap[id];
 	}
 
 	bool pressed;
@@ -52,24 +51,26 @@ public:
 	}
 
 	static bool isPressed(std::string id) {
-		return get(id).pressed;
+		return idInputMap.count(id) == 0 ? false : get(id).pressed;
 	}
 
 	static bool isReleased(std::string id) {
-		return !get(id).pressed;
+		return idInputMap.count(id) == 0 ? true : !get(id).pressed;
 	}
 
 	static bool justPressed(std::string id) {
+		if (idInputMap.count(id) == 0) return false;
 		Input& input = get(id);
 		return input.pressed && input.just;
 	}
 
 	static bool justReleased(std::string id) {
+		if (idInputMap.count(id) == 0) return false;
 		Input& input = get(id);
 		return !input.pressed && input.just;
 	}
 
 	static bool justChanged(std::string id) {
-		return get(id).just;
+		return idInputMap.count(id) == 0 ? false : get(id).just;
 	}
 };
