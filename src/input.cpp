@@ -51,7 +51,7 @@ public:
 		keyInputMap[key] = &idInputMap[id];
 	}
 
-	friend static bool isPressed(std::string id) {
+	static bool isPressed(std::string id) {
 		return get(id).pressed;
 	}
 
