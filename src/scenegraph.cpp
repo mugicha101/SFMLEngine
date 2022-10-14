@@ -1,24 +1,58 @@
 #include <vector>
+#include <functional>
+#include <set>
 
 #include <SFML/Graphics.hpp>
 
 // node on scenegraph heirarchy
 class Node {
 private:
-	sf::Transformable parentTf;
-protected:
-	Node() : parentTf() {}
-public:
-	std::vector<std::shared_ptr<Node>> childNodes;
-	sf::Transformable tf;
+	Node* parent; // parent 
 
+	// sets parent
+	void setParent(Node* parent) {
+		this->parent = parent;
+	}
+protected:
+	std::set<std::shared_ptr<Node>> childNodes;
+
+	Node() : parent(nullptr) {}
+public:
+	sf::Transformable tf; // local transformable
+
+	// create node
 	static std::shared_ptr<Node> create() {
 		return std::shared_ptr<Node>(new Node());
 	}
 
+	// get children
+	const std::set<std::shared_ptr<Node>>& getChildren() {
+		return childNodes;
+	}
+
+	// add child (return if succeeds)
+	bool addChild(std::shared_ptr<Node>& child) {
+		if (childNodes.count(child) == 1) return false;
+		childNodes.insert(child);
+		child->setParent(this);
+		return true;
+	}
+
+	// remove child (return if succeeds)
+	bool removeChild(std::shared_ptr<Node>& child) {
+		if (childNodes.count(child) == 0) return false;
+		childNodes.erase(child);
+		return true;
+	}
+
+	// get absoluate transform (recursive call up the scene graph)
+	sf::Transform getAbsTransform() {
+		return tf.getTransform() * parent->getAbsTransform();
+	}
+
 	// draw self and children
 	void draw(sf::RenderTarget& target, const sf::Transform &parentTrans, int calcTick) {
-		sf::Transform trans = tf.getTransform() * parentTrans;	
+		sf::Transform trans = tf.getTransform() * parentTrans;
 		for (const std::shared_ptr<Node>& node : childNodes) {
 			node->draw(target, trans, calcTick);
 		}
@@ -39,8 +73,23 @@ public:
 	}
 };
 
+// node that can be drawn
+class DrawableNode : public Node {
+private:
+	std::function<void(sf::RenderTarget&, const sf::Transform&, int)> drawFunction;
+public:
+	DrawableNode(std::function<void(sf::RenderTarget&, const sf::Transform&, int)> drawFunction) : drawFunction(drawFunction) {}
+
+	DrawableNode() : drawFunction([](sf::RenderTarget&, const sf::Transform&, int) {}) {}
+
+	void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
+		drawFunction(target, parentTrans, calcTick);
+		Node::draw(target, parentTrans, calcTick);
+	}
+};
+
 // node with sprite
-class ObjectSprite : public Node {
+class ObjectSprite : public DrawableNode {
 protected:
 	sf::Sprite sprite;
 	void loadTexture(sf::Texture& texture, std::string path) {
@@ -48,19 +97,14 @@ protected:
 			throw("cannot load texture from path " + path);
 		}
 	}
-	ObjectSprite() {}
+
+	ObjectSprite() : DrawableNode([this](sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
+		sf::Transform trans = tf.getTransform() * parentTrans;
+		target.draw(sprite, trans);
+		}) {}
 public:
 	sf::Sprite& getSprite() {
 		return sprite;
-	}
-
-	void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
-		// render sprite
-		sf::Transform trans = tf.getTransform() * parentTrans;
-		target.draw(sprite, trans);
-
-		// super call
-		Node::draw(target, parentTrans, calcTick);
 	}
 };
 
