@@ -1,12 +1,13 @@
 #include <SFML/Graphics.hpp>
-
 #include <SFML/Window.hpp>
+
+#include <vector>
 
 #include "../src/input.cpp"
 
 int main() {
     // setup window
-    auto window = sf::RenderWindow{ { 1280, 960 }, "CMake SFML Project" };
+    sf::RenderWindow window = sf::RenderWindow{ { 1280, 960 }, "CMake SFML Project" };
     window.setFramerateLimit(60);
     window.setKeyRepeatEnabled(false);
 
