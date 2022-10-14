@@ -63,13 +63,13 @@ public:
 	}
 
 	static bool justPressed(std::string id) {
-		Data& input = get(id);
-		return input.pressed && input.just;
+		Data& data = get(id);
+		return data.pressed && data.just;
 	}
 
 	static bool justReleased(std::string id) {
-		Data& input = get(id);
-		return !input.pressed && input.just;
+		Data& data = get(id);
+		return !data.pressed && data.just;
 	}
 
 	static bool justChanged(std::string id) {
