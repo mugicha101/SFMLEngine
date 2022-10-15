@@ -15,15 +15,11 @@ private:
 	}
 protected:
 	std::set<std::shared_ptr<Node>> childNodes;
-
-	Node() : parent(nullptr) {}
 public:
 	sf::Transformable tf; // local transformable
 
-	// create node
-	static std::shared_ptr<Node> create() {
-		return std::shared_ptr<Node>(new Node());
-	}
+	// constructor
+	Node() : parent(nullptr) {}
 
 	// get children
 	const std::set<std::shared_ptr<Node>>& getChildren() {
@@ -47,12 +43,12 @@ public:
 
 	// get absoluate transform (recursive call up the scene graph)
 	sf::Transform getAbsTransform() {
-		return tf.getTransform() * parent->getAbsTransform();
+		return parent->getAbsTransform() * tf.getTransform();
 	}
 
 	// draw self and children
-	void draw(sf::RenderTarget& target, const sf::Transform &parentTrans, int calcTick) {
-		sf::Transform trans = tf.getTransform() * parentTrans;
+	virtual void draw(sf::RenderTarget& target, const sf::Transform &parentTrans, int calcTick) {
+		sf::Transform trans = parentTrans * tf.getTransform();
 		for (const std::shared_ptr<Node>& node : childNodes) {
 			node->draw(target, trans, calcTick);
 		}
@@ -62,14 +58,22 @@ public:
 // scene graph
 class SceneGraph {
 private:
-	std::shared_ptr<Node> root;
 public:
-	SceneGraph() {
-		root = Node::create();
+	std::shared_ptr<Node> root;
+	sf::RenderTarget* renderTarget;
+
+	SceneGraph(sf::RenderTarget& renderTarget) {
+		this->renderTarget = &renderTarget;
+		root = std::make_shared<Node>();
 	}
 
-	void drawTick(sf::RenderWindow& window, const sf::Transform& windowTrans, int calcTick) {
-		root->draw(window, windowTrans, calcTick);
+	void drawTick(int calcTick) {
+		renderTarget->clear();
+		root->draw(*renderTarget, sf::Transform::Identity, calcTick);
+	}
+
+	static std::shared_ptr<Node> create() {
+		return std::make_shared<Node>();
 	}
 };
 
@@ -78,13 +82,21 @@ class DrawableNode : public Node {
 private:
 	std::function<void(sf::RenderTarget&, const sf::Transform&, int)> drawFunction;
 public:
-	DrawableNode(std::function<void(sf::RenderTarget&, const sf::Transform&, int)> drawFunction) : drawFunction(drawFunction) {}
+	DrawableNode(std::function<void(sf::RenderTarget&, sf::Transform, int)> drawFunction) : drawFunction(drawFunction) {}
 
-	DrawableNode() : drawFunction([](sf::RenderTarget&, const sf::Transform&, int) {}) {}
+	DrawableNode() : drawFunction([](sf::RenderTarget&, sf::Transform, int) {}) {}
 
-	void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
-		drawFunction(target, parentTrans, calcTick);
+	virtual void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) override {
+		drawFunction(target, parentTrans * tf.getTransform(), calcTick);
 		Node::draw(target, parentTrans, calcTick);
+	}
+
+	static std::shared_ptr<DrawableNode> create() {
+		return std::make_shared<DrawableNode>();
+	}
+
+	static std::shared_ptr<DrawableNode> create(std::function<void(sf::RenderTarget&, sf::Transform, int)> drawFunction) {
+		return std::make_shared<DrawableNode>(drawFunction);
 	}
 };
 
@@ -98,8 +110,7 @@ protected:
 		}
 	}
 
-	ObjectSprite() : DrawableNode([this](sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
-		sf::Transform trans = tf.getTransform() * parentTrans;
+	ObjectSprite() : DrawableNode([this](sf::RenderTarget& target, sf::Transform trans, int calcTick) {
 		target.draw(sprite, trans);
 		}) {}
 public:
@@ -137,7 +148,7 @@ public:
 	}
 	virtual int size(); // returns size of indexed collection of textures
 
-	void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
+	virtual void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) override {
 		updateSprite();
 		ObjectSprite::draw(target, parentTrans, calcTick);
 	}
@@ -201,7 +212,7 @@ public:
 	AnimatedSprite(IndexedSprite sprite, int frameDelay, LoopType loopType) : sprite(sprite), frameDelay(frameDelay), loopType(loopType) {}
 	AnimatedSprite(IndexedSprite sprite, int frameDelay) : AnimatedSprite(sprite, frameDelay, LoopType::forward) {}
 
-	void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) {
+	virtual void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) override {
 		switch (loopType) {
 		case forward:
 			sprite.setIndex((calcTick / frameDelay) % sprite.size());
