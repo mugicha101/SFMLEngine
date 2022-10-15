@@ -9,9 +9,9 @@
 #include <iostream>
 #include <filesystem>
 
-#include "../src/input.cpp"
-#include "../src/scenegraph.cpp"
-#include "../src/audio.cpp"
+#include "./input.cpp"
+#include "./audio.cpp"
+#include "./scenegraph.h"
 
 #define DEBUG_TIMER true
 
@@ -19,7 +19,7 @@
 // execution time tracker
 class ExecTimer {
 private:
-    std::chrono::steady_clock::time_point startTime;
+    std::chrono::high_resolution_clock::time_point startTime;
     std::list<float> times;
     const int trials;
     long long trialSum;
@@ -97,7 +97,7 @@ int main() {
     SoundEffect s("resources/audio/sound/seUseSpellCard.wav");
     s.play();
 
-    MusicTrack m("resources/audio/music/bgm.ogg", true);
+    MusicTrack m("resources/audio/music/IntoTheAbyssStart.ogg", "resources/audio/music/IntoTheAbyssLoop.ogg");
     m.play();
     
     // MusicTrack music("bgm.wav", true);
@@ -165,6 +165,7 @@ int main() {
         // clean sounds
         for (auto& kvp : sounds)
             kvp.second.clean();
+        m.checkLoop();
 
         // move player
         sf::Vector2f movement;
