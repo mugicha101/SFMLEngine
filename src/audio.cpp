@@ -1,5 +1,4 @@
 #include <SFML/Audio.hpp>
-#include <SFML/Audio/SoundBuffer.hpp>
 
 #include <list>
 
@@ -9,7 +8,8 @@ private:
 	std::list<sf::Sound> sounds;
 public:
 	SoundEffect(std::string path) {
-		buffer.loadFromFile(path);
+		if (!buffer.loadFromFile(path))
+			throw("cannot load audio from path " + path);
 	}
 
 	void play() {
@@ -23,7 +23,18 @@ public:
 	}
 };
 
-class Music {
+class MusicTrack {
 private:
+	sf::Music music;
 public:
+	bool loop;
+	MusicTrack(std::string path, bool loop) : loop(loop) {
+		if (!music.openFromFile(path))
+			throw("cannot load audio from path " + path);
+		music.setLoop(loop);
+	}
+
+	void play() {
+		music.play();
+	}
 };

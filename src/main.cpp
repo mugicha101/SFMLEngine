@@ -1,13 +1,17 @@
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
+#include <SFML/Audio.hpp>
 
 #include <vector>
 #include <list>
 #include <memory>
 #include <chrono>
+#include <iostream>
+#include <filesystem>
 
 #include "../src/input.cpp"
 #include "../src/scenegraph.cpp"
+#include "../src/audio.cpp"
 
 #define DEBUG_TIMER true
 
@@ -41,7 +45,7 @@ public:
     }
 
     std::string log() {
-        return label + ": " + (trials == times.size() ? std::to_string(getAvg()/1000)  : "<not enough trials>") + "us";
+        return label + ": " + (trials == times.size() ? std::to_string(getAvg()/1000000)  : "<not enough trials>") + "ms";
     }
 };
 #endif
@@ -86,6 +90,18 @@ int main() {
     A->addChild(B3);
     A->addChild(B4);
     A->tf.setPosition(300, 300);
+
+    // setup sounds
+    std::unordered_map<std::string, SoundEffect> sounds;
+
+    SoundEffect s("resources/audio/sound/seUseSpellCard.wav");
+    s.play();
+
+    MusicTrack m("resources/audio/music/bgm.ogg", true);
+    m.play();
+    
+    // MusicTrack music("bgm.wav", true);
+    // music.play();
 
     // setup inputs
     Input::mapInput(sf::Keyboard::W, "up");
@@ -146,6 +162,9 @@ int main() {
 #if DEBUG_TIMER
         calcTimer.start();
 #endif
+        // clean sounds
+        for (auto& kvp : sounds)
+            kvp.second.clean();
 
         // move player
         sf::Vector2f movement;
