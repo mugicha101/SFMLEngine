@@ -25,16 +25,29 @@ public:
 
 class MusicTrack {
 private:
-	sf::Music music;
+	int status;
+	sf::Music startMusic;
+	sf::Music loopMusic;
 public:
 	bool loop;
-	MusicTrack(std::string path, bool loop) : loop(loop) {
-		if (!music.openFromFile(path))
-			throw("cannot load audio from path " + path);
-		music.setLoop(loop);
+	MusicTrack(std::string startPath, std::string loopPath) : status(0) {
+		if (!startMusic.openFromFile(startPath))
+			throw("cannot load audio from path " + startPath);
+		if (!loopMusic.openFromFile(loopPath))
+			throw("cannot load audio from path " + loopPath);
+		loopMusic.setLoop(true);
 	}
 
 	void play() {
-		music.play();
+		status = 1;
+		startMusic.play();
+	}
+
+	void checkLoop() {
+		if (status != 1) return;
+		if (!startMusic.getStatus()) {
+			loopMusic.play();
+			status = 2;
+		}
 	}
 };
