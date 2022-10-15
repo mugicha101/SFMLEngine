@@ -1,11 +1,13 @@
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <SFML/Graphics.hpp>
 
 class Input {
 private:
 	struct Data {
+		std::unordered_set<sf::Keyboard::Key> keysDown;
 		bool pressed;
 		bool just;
 		
@@ -15,43 +17,64 @@ private:
 			just = false;
 		}
 
-		void update(bool newPressedState) {
-			just = newPressedState != pressed;
-			pressed = newPressedState;
+		void update(sf::Keyboard::Key key, bool newPressedState) {
+			if (newPressedState) {
+				keysDown.insert(key);
+			}
+			else {
+				keysDown.erase(key);
+			}
+			bool newPressed = keysDown.size() != 0;
+			just = newPressed != pressed;
+			pressed = newPressed;
 		}
 	};
 
-	static Data nullData;
+	static std::unordered_map<std::string, Data>& getIdMap() {
+		static auto* idMap = new std::unordered_map<std::string, Data>();
+		return *idMap;
+	}
 
-	inline static std::unordered_map<std::string, Data> idMap;
-	inline static std::unordered_map<sf::Keyboard::Key, Data*> keyMap;
-	inline static std::vector<std::pair<sf::Keyboard::Key, bool>> events;
+	static std::unordered_map<sf::Keyboard::Key, Data*>& getKeyMap() {
+		static auto* keyMap = new std::unordered_map<sf::Keyboard::Key, Data*>();
+		return *keyMap;
+	}
+
+	static std::vector<std::pair<sf::Keyboard::Key, bool>>& getEvents() {
+		static auto* events = new std::vector<std::pair<sf::Keyboard::Key, bool>>();
+		return *events;
+	}
+
+	static Data& getNullData() {
+		static auto* nullData = new Data();
+		return *nullData;
+	}
 
 	static Data& get(std::string id) {
-		return idMap.count(id) == 0 ? nullData : idMap[id];
+		return getIdMap().count(id) == 0 ? getNullData() : getIdMap()[id];
 	}
 public:
 	static void inputEvent(sf::Keyboard::Key key, bool pressed) {
-		events.emplace_back(key, pressed);
+		getEvents().emplace_back(key, pressed);
 	}
 
 	// advance state by a tick
 	static void inputTick() {
 		// change just to false
-		for (auto& kvp : idMap)
+		for (auto& kvp : getIdMap())
 			kvp.second.tick();
 
 		// update state of inputs that got updated
-		for (const auto& e : events) {
-			if (keyMap.find(e.first) == keyMap.end()) continue;
-			keyMap[e.first]->update(e.second);
+		for (const auto& e : getEvents()) {
+			if (getKeyMap().find(e.first) == getKeyMap().end()) continue;
+			getKeyMap()[e.first]->update(e.first, e.second);
 		}
-		events.clear();
+		getEvents().clear();
 	}
 
 	// maps a key to an input (note: only one input per key allowed)
 	static void mapInput(sf::Keyboard::Key key, std::string id) {
-		keyMap[key] = &idMap[id];
+		getKeyMap()[key] = &getIdMap()[id];
 	}
 
 	static bool isPressed(std::string id) {
