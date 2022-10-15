@@ -2,15 +2,55 @@
 #include <SFML/Window.hpp>
 
 #include <vector>
+#include <list>
 #include <memory>
+#include <chrono>
 
 #include "../src/input.cpp"
 #include "../src/scenegraph.cpp"
 
+#define DEBUG_TIMER true
+
+#if DEBUG_TIMER
+// execution time tracker
+class ExecTimer {
+private:
+    std::chrono::steady_clock::time_point startTime;
+    std::list<float> times;
+    const int trials;
+    long long trialSum;
+public:
+    const std::string label;
+    ExecTimer(std::string label, int trials) : label(label), trials(trials), trialSum(0) {}
+
+    void start() {
+        startTime = std::chrono::high_resolution_clock::now();
+    }
+
+    void record() {
+        times.push_back((std::chrono::high_resolution_clock::now() - startTime).count());
+        trialSum += times.back();
+        if (times.size() > trials) {
+            trialSum -= times.front();
+            times.pop_front();
+        }
+    }
+
+    long long getAvg() {
+        return trialSum / trials;
+    }
+
+    std::string log() {
+        return label + ": " + (trials == times.size() ? std::to_string(getAvg()/1000)  : "<not enough trials>") + "us";
+    }
+};
+#endif
+
 int main() {
     // setup window
+    const int FPS = 60;
     sf::RenderWindow window = sf::RenderWindow{ { 1280, 960 }, "CMake SFML Project" };
-    window.setFramerateLimit(60);
+    window.setFramerateLimit(FPS);
     window.setKeyRepeatEnabled(false);
 
     // setup scene
@@ -57,10 +97,28 @@ int main() {
     Input::mapInput(sf::Keyboard::Down, "down");
     Input::mapInput(sf::Keyboard::Right, "right");
 
+    // setup timing
+#if DEBUG_TIMER
+    const int TRIALS = FPS;
+    ExecTimer inputTimer("input time", TRIALS);
+    ExecTimer calcTimer("calc time", TRIALS);
+    ExecTimer drawTimer("draw time", TRIALS);
+    ExecTimer frameTimer("frame time", TRIALS);
+#endif
+
     // game loop
     int calcTick = 0;
     while (window.isOpen())
     {
+#if DEBUG_TIMER
+        frameTimer.start();
+#endif
+
+        // INPUT STEP
+#if DEBUG_TIMER
+        inputTimer.start();
+#endif
+
         // event loop
         for (auto event = sf::Event{}; window.pollEvent(event);)
         {
@@ -76,7 +134,18 @@ int main() {
                 break;
             }
         }
+
+        // update input states
         Input::inputTick();
+
+#if DEBUG_TIMER
+        inputTimer.record();
+#endif
+
+        // CALC STEP
+#if DEBUG_TIMER
+        calcTimer.start();
+#endif
 
         // move player
         sf::Vector2f movement;
@@ -93,12 +162,29 @@ int main() {
         B1->tf.move(movement * speed);
         A->tf.setScale(0.5f + movement.x * movement.x, 0.5f + movement.y * movement.y);
 
+#if DEBUG_TIMER
+        calcTimer.record();
+#endif
+
+        // DRAW STEP
+#if DEBUG_TIMER
+        drawTimer.start();
+#endif
+
         // draw scenegraph
         sceneGraph.drawTick(calcTick);
-        
-        // display window
         window.display();
 
+#if DEBUG_TIMER
+        drawTimer.record();
+        frameTimer.record();
+#endif
+
+        // DEBUG STEP
+#if DEBUG_TIMER
+        if (calcTick % FPS == 0)
+            printf("tick %d: %s %s %s %s\n", calcTick, inputTimer.log().c_str(), calcTimer.log().c_str(), drawTimer.log().c_str(), frameTimer.log().c_str());
+#endif
         calcTick++;
     }
 }
