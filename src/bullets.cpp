@@ -1,26 +1,9 @@
-# include "./scenegraph.h"
+# include "./bullets.h"
 
-# include <SFML/Graphics.hpp>
-# include <memory>
-# include <list>
-# include <vector>
+std::shared_ptr<Node> Bullet::rootNode = std::make_shared<Node>();
+std::list<std::shared_ptr<Bullet>> Bullet::bullets = std::list<std::shared_ptr<Bullet>>();
 
-class Bullet {
-private:
-	std::shared_ptr<DrawableNode> node;
-public:
-	static std::shared_ptr<Node>& getBulletsNode() {
-		static auto* bulletsNode = new std::shared_ptr<Node>();
-		return *bulletsNode;
-	}
-
-	static std::list<Node>& getBullets() {
-		static auto* bullets = new std::list<Node>();
-		return *bullets;
-	}
-
-	Bullet(std::shared_ptr<DrawableNode> node) {
-		this->node = node;
-		
-	}
-};
+std::shared_ptr<Bullet> Bullet::create(std::shared_ptr<DrawableNode> node) {
+    Bullet::bullets.push_back(std::make_shared<Bullet>(node));
+    return Bullet::bullets.back();
+}

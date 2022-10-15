@@ -9,7 +9,7 @@
 #include <iostream>
 #include <filesystem>
 
-#include "./input.cpp"
+#include "./input.h"
 #include "./audio.cpp"
 #include "./scenegraph.h"
 
@@ -45,7 +45,7 @@ public:
     }
 
     std::string log() {
-        return label + ": " + (trials == times.size() ? std::to_string(getAvg()/1000000)  : "<not enough trials>") + "ms";
+        return label + ": " + (trials == times.size() ? std::to_string(getAvg()/1000)  : "<not enough trials>") + "us";
     }
 };
 #endif
@@ -193,7 +193,6 @@ int main() {
 
         // draw scenegraph
         sceneGraph.drawTick(calcTick);
-        window.display();
 
 #if DEBUG_TIMER
         drawTimer.record();
@@ -205,6 +204,9 @@ int main() {
         if (calcTick % FPS == 0)
             printf("tick %d: %s %s %s %s\n", calcTick, inputTimer.log().c_str(), calcTimer.log().c_str(), drawTimer.log().c_str(), frameTimer.log().c_str());
 #endif
+
+        // DISPLAY
+        window.display();
         calcTick++;
     }
 }
