@@ -2,6 +2,7 @@
 #include <SFML/Window.hpp>
 
 #include <vector>
+#include <memory>
 
 #include "../src/input.cpp"
 #include "../src/scenegraph.cpp"
