@@ -32,7 +32,7 @@ public:
     }
 
     // add child (return if succeeds)
-    bool addChild(std::shared_ptr<Node>& child) {
+    bool addChild(std::shared_ptr<Node> child) {
         if (std::count(childNodes.begin(), childNodes.end(), child) != 0) return false;
         childNodes.push_back(child);
         child->setParent(this);
