@@ -1,7 +1,11 @@
+#ifndef NODES_H
+#define NODES_H
+
 #include <vector>
 #include <functional>
-#include <set>
+#include <list>
 #include <memory>
+#include <algorithm>
 
 #include <SFML/Graphics.hpp>
 
@@ -15,7 +19,7 @@ private:
         this->parent = parent;
     }
 protected:
-    std::set<std::shared_ptr<Node>> childNodes;
+    std::list<std::shared_ptr<Node>> childNodes;
 public:
     sf::Transformable tf; // local transformable
 
@@ -23,23 +27,23 @@ public:
     Node() : parent(nullptr) {}
 
     // get children
-    const std::set<std::shared_ptr<Node>>& getChildren() {
+    const std::list<std::shared_ptr<Node>>& getChildren() {
         return childNodes;
     }
 
     // add child (return if succeeds)
     bool addChild(std::shared_ptr<Node>& child) {
-        if (childNodes.count(child) == 1) return false;
-        childNodes.insert(child);
+        if (std::count(childNodes.begin(), childNodes.end(), child) != 0) return false;
+        childNodes.push_back(child);
         child->setParent(this);
         return true;
     }
 
     // remove child (return if succeeds)
     bool removeChild(std::shared_ptr<Node>& child) {
-        if (childNodes.count(child) == 0) return false;
-        childNodes.erase(child);
-        return true;
+        int s = childNodes.size();
+        childNodes.remove(child);
+        return s < childNodes.size();
     }
 
     // get absoluate transform (recursive call up the scene graph)
@@ -209,3 +213,5 @@ public:
         ObjectSprite::draw(target, parentTrans, calcTick);
     }
 };
+
+#endif

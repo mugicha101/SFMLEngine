@@ -8,10 +8,14 @@
 #include <chrono>
 #include <iostream>
 #include <filesystem>
+#include <random>
+
+#include <cmath>
 
 #include "./input.h"
 #include "./audio.cpp"
 #include "./scenegraph.h"
+#include "./bullets.h"
 
 #define DEBUG_TIMER true
 
@@ -49,6 +53,12 @@ public:
     }
 };
 #endif
+
+float randDir() {
+    static std::default_random_engine e;
+    static std::uniform_real_distribution<> randDir(0, M_PI * 2);
+    return randDir(e);
+}
 
 int main() {
     // setup window
@@ -91,6 +101,13 @@ int main() {
     A->addChild(B4);
     A->tf.setPosition(300, 300);
 
+    sceneGraph.root->addChild(Bullet::rootNode);
+    Bullet::init(window.getSize());
+    Bullet::rootNode->tf.setPosition(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
+    
+    for (int i = 0; i < 500; ++i)
+        Bullet::create(Bullet::Type::orb, sf::Color::Red, 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 1.0f);
+
     // setup sounds
     std::unordered_map<std::string, SoundEffect> sounds;
 
@@ -99,9 +116,6 @@ int main() {
 
     MusicTrack m("resources/audio/music/IntoTheAbyssStart.ogg", "resources/audio/music/IntoTheAbyssLoop.ogg");
     m.play();
-    
-    // MusicTrack music("bgm.wav", true);
-    // music.play();
 
     // setup inputs
     Input::mapInput(sf::Keyboard::W, "up");
@@ -166,6 +180,11 @@ int main() {
         for (auto& kvp : sounds)
             kvp.second.clean();
         m.checkLoop();
+
+        // spawn bullets
+
+        // move bullets
+        Bullet::moveTick();
 
         // move player
         sf::Vector2f movement;

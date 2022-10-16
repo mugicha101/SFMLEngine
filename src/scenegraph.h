@@ -1,4 +1,7 @@
-#include "./nodes.cpp"
+#ifndef SCENEGRAPH_H
+#define SCENEGRAPH_H
+
+#include "./nodes.h"
 
 // scene graph
 class SceneGraph {
@@ -21,3 +24,5 @@ public:
         return std::make_shared<Node>();
     }
 };
+
+#endif
