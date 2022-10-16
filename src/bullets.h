@@ -7,6 +7,7 @@
 # include <memory>
 # include <list>
 # include <vector>
+# include <cmath>
 
 const char RadialGradient[] =
 "uniform vec4 color;"
