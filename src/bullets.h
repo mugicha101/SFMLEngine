@@ -165,6 +165,7 @@ public:
     }
 
     bool alive;
+    int aliveTime;
     Type type;
     float radius;
     float x, y;
@@ -172,7 +173,8 @@ public:
     sf::Color color;
     sf::CircleShape circle;
 
-    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed) : alive(true), type(type), radius(radius), x(x), y(y), color(color), dir(dir), speed(speed) {
+    // TODO: render bullet onto seperate canvas (update only when needed) and render that canvas onto window (saves computation time)
+    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed) : alive(true), aliveTime(0), type(type), radius(radius), x(x), y(y), color(color), dir(dir), speed(speed) {
         switch (type) {
         case orb:
             circle = sf::CircleShape(2.f);
@@ -180,21 +182,23 @@ public:
             circle.setFillColor(sf::Color::Transparent);
             this->frontNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
                 sf::Color& color = this->color;
-                sf::RenderStates states;
-                bulletFrontShader.setUniform("colorCenter", sf::Glsl::Vec4(1.f, 1.f, 1.f, 1.f));
+                static sf::RenderStates states(&bulletFrontShader);
+                if (this->aliveTime == 1) {
+                    bulletFrontShader.setUniform("colorCenter", sf::Glsl::Vec4(1.f, 1.f, 1.f, 1.f));
+                    bulletFrontShader.setUniform("radius", this->radius * circle.getRadius());
+                }
                 bulletFrontShader.setUniform("center", trans * circle.getPosition());
-                bulletFrontShader.setUniform("radius", this->radius * circle.getRadius());
-                states.shader = &bulletFrontShader;
                 states.transform = trans;
                 renderTarget.draw(circle, states);
                 });
             this->backNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
                 sf::Color& color = this->color;
-                sf::RenderStates states;
-                bulletBackShader.setUniform("colorPrimary", sf::Glsl::Vec4(color.r * div255, color.g * div255, color.b * div255, color.a * div255));
+                static sf::RenderStates states(&bulletBackShader);
+                if (this->aliveTime == 1) {
+                    bulletBackShader.setUniform("colorPrimary", sf::Glsl::Vec4(color.r * div255, color.g * div255, color.b * div255, color.a * div255));
+                    bulletBackShader.setUniform("radius", this->radius * circle.getRadius());
+                }
                 bulletBackShader.setUniform("center", trans * circle.getPosition());
-                bulletBackShader.setUniform("radius", this->radius * circle.getRadius());
-                states.shader = &bulletBackShader;
                 states.transform = trans;
                 renderTarget.draw(circle, states);
                 });
@@ -219,6 +223,8 @@ public:
         // move
         x += std::cos(dir) * speed;
         y += std::sin(dir) * speed;
+
+        aliveTime++;
 
         // update draw nodes
         frontNode->tf.setScale(this->radius, this->radius);

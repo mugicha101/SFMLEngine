@@ -105,7 +105,7 @@ int main() {
     Bullet::init(window.getSize());
     Bullet::rootNode->tf.setPosition(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
     
-    for (int i = 0; i < 500; ++i)
+    for (int i = 0; i < 750; ++i)
         Bullet::create(Bullet::Type::orb, sf::Color::Red, 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 1.0f);
 
     // setup sounds

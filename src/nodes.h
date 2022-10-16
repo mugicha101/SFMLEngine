@@ -40,7 +40,7 @@ public:
     }
 
     // remove child (return if succeeds)
-    bool removeChild(std::shared_ptr<Node>& child) {
+    bool removeChild(std::shared_ptr<Node> child) {
         int s = childNodes.size();
         childNodes.remove(child);
         return s < childNodes.size();
