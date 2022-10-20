@@ -58,6 +58,10 @@ public:
             node->draw(target, trans, calcTick);
         }
     }
+
+    static std::shared_ptr<Node> create() {
+        return std::make_shared<Node>();
+    }
 };
 
 // node that can be drawn

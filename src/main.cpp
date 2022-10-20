@@ -104,9 +104,20 @@ int main() {
     sceneGraph.root->addChild(Bullet::rootNode);
     Bullet::init(window.getSize());
     Bullet::rootNode->tf.setPosition(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
+
+    auto rainbow = [](float t) {
+        int r = std::round(255 * std::sinf(t * 2.f * M_PI));
+        int g = std::round(255 * std::sinf((t + 1.f / 3.f) * 2.f * M_PI));
+        int b = std::round(255 * std::sinf((t + 2.f / 3.f) * 2.f * M_PI));
+        return sf::Color(r, g, b, 255);
+    };
     
     for (int i = 0; i < 750; ++i)
-        Bullet::create(Bullet::Type::orb, sf::Color::Red, 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 1.0f);
+        Bullet::create(Bullet::Type::orb, rainbow(i / 750.f), 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 0.5f);
+
+    // create background
+    std::shared_ptr<Node> starField = Node::create();
+    sceneGraph.root->addChild(starField);
 
     // setup sounds
     std::unordered_map<std::string, SoundEffect> sounds;
@@ -176,10 +187,13 @@ int main() {
 #if DEBUG_TIMER
         calcTimer.start();
 #endif
+        // TODO: add ability to do multiple calc ticks in order to account for draw lag
         // clean sounds
         for (auto& kvp : sounds)
             kvp.second.clean();
         m.checkLoop();
+
+        // update background
 
         // spawn bullets
 
@@ -197,7 +211,8 @@ int main() {
             movement.x -= 1;
         if (Input::isPressed("right"))
             movement.x += 1;
-        A->tf.move(movement * speed);
+        Player::pos += movement * speed;
+        A->tf.setPosition(Player::pos + sf::Vector2f(window.getSize().x * 0.5f, window.getSize().y * 0.5f));
         B1->tf.move(movement * speed);
         A->tf.setScale(0.5f + movement.x * movement.x, 0.5f + movement.y * movement.y);
 

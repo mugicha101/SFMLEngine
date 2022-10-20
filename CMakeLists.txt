@@ -7,7 +7,7 @@ FetchContent_Declare(SFML
     GIT_TAG 2.6.x)
 FetchContent_MakeAvailable(SFML)
 
-add_executable(CMakeSFMLProject src/main.cpp "src/input.h" "src/nodes.h" "src/audio.cpp" "src/bullets.cpp" "src/scenegraph.h" "src/input.cpp" "src/bullets.h")
+add_executable(CMakeSFMLProject src/main.cpp "src/input.h" "src/nodes.h" "src/audio.cpp" "src/bullets.cpp" "src/scenegraph.h" "src/input.cpp" "src/bullets.h" "src/player.h" "src/player.cpp")
 target_link_libraries(CMakeSFMLProject PRIVATE sfml-graphics sfml-audio)
 target_compile_features(CMakeSFMLProject PRIVATE cxx_std_17)
 add_custom_command(TARGET CMakeSFMLProject PRE_BUILD

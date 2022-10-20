@@ -2,10 +2,11 @@
 # define BULLETS_H
 
 # include "./scenegraph.h"
+# include "./player.h"
 
 # include <SFML/Graphics.hpp>
 # include <memory>
-# include <list>
+# include <deque>
 # include <vector>
 # include <cmath>
 
@@ -94,7 +95,7 @@ const char BulletBackGradient[] =
 "}"
 "else"
 "{"
-"color = gl_Color;"
+"color = clear;"
 "}"
 "gl_FragColor = color;"
 "}";
@@ -121,7 +122,7 @@ const char BulletFrontGradient[] =
 "}"
 "else"
 "{"
-"color = gl_Color;"
+"color = clear;"
 "}"
 "gl_FragColor = color;"
 "}";
@@ -141,9 +142,17 @@ private:
     static sf::Shader bulletFrontShader;
     static sf::Shader bulletBackShader;
     static sf::Vector2u wSize;
+    static const int BULLET_RENDER_RADIUS;
+    static const float COLLISION_DIST_SQD;
+    static const int BULLET_DEATH_TIME;
 
     std::shared_ptr<DrawableNode> frontNode;
     std::shared_ptr<DrawableNode> backNode;
+
+    sf::Texture textureFront;
+    sf::Texture textureBack;
+    sf::Sprite spriteFront;
+    sf::Sprite spriteBack;
 public:
     enum Type {
         orb,
@@ -152,7 +161,7 @@ public:
     static std::shared_ptr<Node> rootNode;
     static std::shared_ptr<Node> frontRootNode;
     static std::shared_ptr<Node> backRootNode;
-    static std::list<std::shared_ptr<Bullet>> bullets;
+    static std::vector<std::shared_ptr<Bullet>> bullets;
 
     static void init(sf::Vector2u windowSize) {
         rootNode->addChild(backRootNode);
@@ -160,13 +169,12 @@ public:
 
         wSize = windowSize;
         bulletFrontShader.loadFromMemory(VertexShader, BulletFrontGradient);
-        bulletFrontShader.setUniform("windowHeight", static_cast<float>(wSize.y)); // this must be set, but only needs to be set once (or whenever the size of the window changes)
         bulletBackShader.loadFromMemory(VertexShader, BulletBackGradient);
-        bulletBackShader.setUniform("windowHeight", static_cast<float>(wSize.y)); // this must be set, but only needs to be set once (or whenever the size of the window changes)
     }
 
+    bool remove;
     bool alive;
-    int aliveTime;
+    int time;
     Type type;
     float radius;
     float x, y;
@@ -175,33 +183,53 @@ public:
     sf::CircleShape circle;
 
     // TODO: render bullet onto seperate canvas (update only when needed) and render that canvas onto window (saves computation time)
-    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed) : alive(true), aliveTime(0), type(type), radius(radius), x(x), y(y), color(color), dir(dir), speed(speed) {
+    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed) : remove(false), alive(true), time(0), type(type), radius(radius), x(x), y(y), color(color), dir(dir), speed(speed) {
         switch (type) {
         case orb:
-            circle = sf::CircleShape(2.f);
+            circle = sf::CircleShape(BULLET_RENDER_RADIUS * 2);
             circle.setOrigin(circle.getRadius(), circle.getRadius());
+            circle.setPosition(circle.getRadius(), circle.getRadius());
             circle.setFillColor(sf::Color::Transparent);
+            int ts = std::ceil(circle.getRadius() * 2);
+
+            static sf::RenderTexture rtFront;
+            static sf::RenderTexture rtBack;
+            if (!rtFront.create(ts, ts) || !rtBack.create(ts, ts)) throw("error creating bullet render textures");
+
+            // front texture
+            sf::Color colorCenter(255, 255, 255, 255);
+            static bool init = false;
+            if (!init) {
+                bulletFrontShader.setUniform("windowHeight", (float)ts);
+                bulletFrontShader.setUniform("radius", circle.getRadius());
+                bulletFrontShader.setUniform("center", sf::Vector2f(ts * 0.5f, ts * 0.5f));
+            }
+            bulletFrontShader.setUniform("colorCenter", sf::Glsl::Vec4(colorCenter.r * div255, colorCenter.g * div255, colorCenter.b * div255, colorCenter.a * div255));
+            rtFront.clear(colorCenter * sf::Color(255, 255, 255, 0));
+            rtFront.draw(circle, &bulletFrontShader);
+            textureFront = rtFront.getTexture();
+            spriteFront = sf::Sprite(textureFront);
+            spriteFront.setOrigin(ts * 0.5f, ts * 0.5f);
+
+            // back texture
+            if (!init) {
+                init = true;
+                bulletBackShader.setUniform("windowHeight", (float)ts);
+                bulletBackShader.setUniform("radius", circle.getRadius());
+                bulletBackShader.setUniform("center", sf::Vector2f(ts * 0.5f, ts * 0.5f));
+            }
+            bulletBackShader.setUniform("colorPrimary", sf::Glsl::Vec4(color.r * div255, color.g * div255, color.b * div255, color.a * div255));
+            rtBack.clear(color * sf::Color(255, 255, 255, 0));
+            rtBack.draw(circle, &bulletBackShader);
+            textureBack = rtBack.getTexture();
+            spriteBack = sf::Sprite(textureBack);
+            spriteBack.setOrigin(ts * 0.5f, ts * 0.5f);
+
             this->frontNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-                sf::Color& color = this->color;
-                static sf::RenderStates states(&bulletFrontShader);
-                if (this->aliveTime == 1) {
-                    bulletFrontShader.setUniform("colorCenter", sf::Glsl::Vec4(1.f, 1.f, 1.f, 1.f));
-                    bulletFrontShader.setUniform("radius", this->radius * circle.getRadius());
-                }
-                bulletFrontShader.setUniform("center", trans * circle.getPosition());
-                states.transform = trans;
-                renderTarget.draw(circle, states);
+                renderTarget.draw(spriteFront, trans);
                 });
             this->backNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-                sf::Color& color = this->color;
-                static sf::RenderStates states(&bulletBackShader);
-                if (this->aliveTime == 1) {
-                    bulletBackShader.setUniform("colorPrimary", sf::Glsl::Vec4(color.r * div255, color.g * div255, color.b * div255, color.a * div255));
-                    bulletBackShader.setUniform("radius", this->radius * circle.getRadius());
-                }
-                bulletBackShader.setUniform("center", trans * circle.getPosition());
-                states.transform = trans;
-                renderTarget.draw(circle, states);
+                renderTarget.draw(spriteBack, trans);
                 });
             break;
         }
@@ -214,24 +242,54 @@ public:
 
     // run move tick for all bullets
     static void moveTick() {
-        for (std::shared_ptr<Bullet> b : bullets) {
+        // move bullets
+        for (std::shared_ptr<Bullet> b : bullets)
             b->tick();
-        }
+
+        // remove dead bullets
+        bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const std::shared_ptr<Bullet> &b) {
+            return b->remove;
+            }), bullets.end());
+    }
+
+    void kill() {
+        if (!alive) return;
+        alive = false;
+        time = 0;
     }
 
     // move tick
     void tick() {
-        // move
-        x += std::cos(dir) * speed;
-        y += std::sin(dir) * speed;
+        if (remove) return;
+        if (alive) {
+            // move
+            x += std::cos(dir) * speed;
+            y += std::sin(dir) * speed;
 
-        aliveTime++;
+            // collisions
+            if (std::powf(Player::pos.x - x, 2) + std::powf(Player::pos.y - y, 2) <= COLLISION_DIST_SQD) {
+                kill();
+            }
+        }
 
-        // update draw nodes
-        frontNode->tf.setScale(this->radius, this->radius);
+        // update draw 
+        static float INV_BDT = 1.f / BULLET_DEATH_TIME;
+        static float INV_BRR = 1.f / BULLET_RENDER_RADIUS;
+        float s = (alive? 1 : (BULLET_DEATH_TIME-this->time) * INV_BDT) * radius * INV_BRR;
+        frontNode->tf.setScale(s, s);
         frontNode->tf.setPosition(this->x, this->y);
-        backNode->tf.setScale(this->radius, this->radius);
+        backNode->tf.setScale(s, s);
         backNode->tf.setPosition(this->x, this->y);
+
+        // update time
+        time++;
+
+        // remove
+        if (!alive && time >= BULLET_DEATH_TIME) {
+            remove = true;
+            frontRootNode->removeChild(this->frontNode);
+            backRootNode->removeChild(this->backNode);
+        }
     }
 };
 
