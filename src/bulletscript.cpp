@@ -118,7 +118,7 @@ public:
             b.rotDist = 0;
         }
         else {
-            b.rotDist = std::sqrtf(std::powf(b.x - b.rotOrigin.x, 2) + std::powf(b.y - b.rotOrigin.y, 2));
+            b.rotDist = std::sqrtf(std::pow(b.x - b.rotOrigin.x, 2) + std::pow(b.y - b.rotOrigin.y, 2));
             b.dir = std::atan2f(b.rotOrigin.y - b.y, b.rotOrigin.x - b.x);
         }
         return true;
@@ -170,8 +170,8 @@ public:
 
     bool apply(Bullet& b) {
         bool outside = (
-            std::powf(Player::pos.x - b.x, 2) +
-            std::powf(Player::pos.y - b.y, 2)
+            std::pow(Player::pos.x - b.x, 2) +
+            std::pow(Player::pos.y - b.y, 2)
             ) > distSqd;
         return within ^ outside;
     }
