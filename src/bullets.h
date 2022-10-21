@@ -137,6 +137,8 @@ const char VertexShader[] =
 
 const float div255 = 1.f / 255.f;
 
+class BulletScript;
+
 class Bullet {
 private:
     static sf::Shader bulletFrontShader;
@@ -173,8 +175,8 @@ public:
     }
 
     bool remove;
-    bool updateTexture;
     bool alive;
+    bool updateTexture;
     int time;
     Type type;
     float radius;
@@ -182,6 +184,8 @@ public:
     float dir, speed, accel, accelCap;
     sf::Color color;
     sf::CircleShape circle;
+    std::shared_ptr<BulletScript> script;
+    bool scriptFinished;
 
     // rotate info
     // note: when rotating, speed/accel = dist speed/accel, dir = dir, and rotation has seperate accel parameter
@@ -190,11 +194,29 @@ public:
     float rotDist, rotSpeed, rotAccel, rotAccelCap;
 
     // TODO: render bullet onto seperate canvas (update only when needed) and render that canvas onto window (saves computation time)
-    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed) : 
-        remove(false), updateTexture(true), alive(true), time(0),
-        type(type), color(color), radius(radius),
-        x(x), y(y), dir(dir), speed(speed), accel(0), accelCap(0),
-        rotate(false), rotOrigin({x,y}), rotDist(0), rotSpeed(0), rotAccel(0), rotAccelCap(0) {
+    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script) {
+        remove = false;
+        alive = true;
+        updateTexture = true;
+        time = 0;
+        this->type = type;
+        this->radius = radius;
+        this->x = x;
+        this->y = y;
+        this->dir = dir;
+        this->speed = speed;
+        accel = 0;
+        accelCap = 0;
+        this->color = color;
+        rotate = false;
+        rotOrigin = { x, y };
+        rotDist = 0;
+        rotSpeed = 0;
+        rotAccel = 0;
+        rotAccelCap = 0;
+        this->script = script;
+        scriptFinished = script == nullptr;
+
         switch (type) {
         case orb:
             circle = sf::CircleShape(BULLET_RENDER_RADIUS * 2);
@@ -215,7 +237,7 @@ public:
     }
 
     // create bullet and put into bullets list
-    static std::shared_ptr<Bullet> create(Type type, sf::Color color, float radius, float x, float y, float dir, float speed);
+    static std::shared_ptr<Bullet> create(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script);
 
     // run move tick for all bullets
     static void moveTick() {
@@ -235,81 +257,48 @@ public:
         time = 0;
     }
 
-    // move tick
-    void tick() {
-        if (remove) return;
-        if (alive) {
-            // move
-            x += std::cos(dir) * speed;
-            y += std::sin(dir) * speed;
+    void createTexture() {
+        switch (type) {
+        case orb:
+            static sf::RenderTexture rtFront;
+            static sf::RenderTexture rtBack;
+            int ts = std::ceil(circle.getRadius() * 2);
+            if (!rtFront.create(ts, ts) || !rtBack.create(ts, ts)) throw("error creating bullet render textures");
 
-            // collisions
-            if (std::pow(Player::pos.x - x, 2) + std::pow(Player::pos.y - y, 2) <= COLLISION_DIST_SQD) {
-                kill();
+            // front texture
+            sf::Color colorCenter(255, 255, 255, 255);
+            static bool init = false;
+            if (!init) {
+                bulletFrontShader.setUniform("windowHeight", (float)ts);
+                bulletFrontShader.setUniform("radius", circle.getRadius());
+                bulletFrontShader.setUniform("center", sf::Vector2f(ts * 0.5f, ts * 0.5f));
             }
-        }
+            bulletFrontShader.setUniform("colorCenter", sf::Glsl::Vec4(colorCenter.r * div255, colorCenter.g * div255, colorCenter.b * div255, colorCenter.a * div255));
+            rtFront.clear(colorCenter * sf::Color(255, 255, 255, 0));
+            rtFront.draw(circle, &bulletFrontShader);
+            textureFront = rtFront.getTexture();
+            spriteFront = sf::Sprite(textureFront);
+            spriteFront.setOrigin(ts * 0.5f, ts * 0.5f);
 
-        // update texture
-        if (updateTexture) {
-            updateTexture = false;
-            switch (type) {
-            case orb:
-                static sf::RenderTexture rtFront;
-                static sf::RenderTexture rtBack;
-                int ts = std::ceil(circle.getRadius() * 2);
-                if (!rtFront.create(ts, ts) || !rtBack.create(ts, ts)) throw("error creating bullet render textures");
-
-                // front texture
-                sf::Color colorCenter(255, 255, 255, 255);
-                static bool init = false;
-                if (!init) {
-                    bulletFrontShader.setUniform("windowHeight", (float)ts);
-                    bulletFrontShader.setUniform("radius", circle.getRadius());
-                    bulletFrontShader.setUniform("center", sf::Vector2f(ts * 0.5f, ts * 0.5f));
-                }
-                bulletFrontShader.setUniform("colorCenter", sf::Glsl::Vec4(colorCenter.r * div255, colorCenter.g * div255, colorCenter.b * div255, colorCenter.a * div255));
-                rtFront.clear(colorCenter * sf::Color(255, 255, 255, 0));
-                rtFront.draw(circle, &bulletFrontShader);
-                textureFront = rtFront.getTexture();
-                spriteFront = sf::Sprite(textureFront);
-                spriteFront.setOrigin(ts * 0.5f, ts * 0.5f);
-
-                // back texture
-                if (!init) {
-                    init = true;
-                    bulletBackShader.setUniform("windowHeight", (float)ts);
-                    bulletBackShader.setUniform("radius", circle.getRadius());
-                    bulletBackShader.setUniform("center", sf::Vector2f(ts * 0.5f, ts * 0.5f));
-                }
-                bulletBackShader.setUniform("colorPrimary", sf::Glsl::Vec4(color.r * div255, color.g * div255, color.b * div255, color.a * div255));
-                rtBack.clear(color * sf::Color(255, 255, 255, 0));
-                rtBack.draw(circle, &bulletBackShader);
-                textureBack = rtBack.getTexture();
-                spriteBack = sf::Sprite(textureBack);
-                spriteBack.setOrigin(ts * 0.5f, ts * 0.5f);
-                break;
+            // back texture
+            if (!init) {
+                init = true;
+                bulletBackShader.setUniform("windowHeight", (float)ts);
+                bulletBackShader.setUniform("radius", circle.getRadius());
+                bulletBackShader.setUniform("center", sf::Vector2f(ts * 0.5f, ts * 0.5f));
             }
-        }
-
-        // update draw 
-        static float INV_BDT = 1.f / BULLET_DEATH_TIME;
-        static float INV_BRR = 1.f / BULLET_RENDER_RADIUS;
-        float s = (alive? 1 : (BULLET_DEATH_TIME-this->time) * INV_BDT) * radius * INV_BRR;
-        frontNode->tf.setScale(s, s);
-        frontNode->tf.setPosition(this->x, this->y);
-        backNode->tf.setScale(s, s);
-        backNode->tf.setPosition(this->x, this->y);
-
-        // update time
-        time++;
-
-        // remove
-        if (!alive && time >= BULLET_DEATH_TIME) {
-            remove = true;
-            frontRootNode->removeChild(this->frontNode);
-            backRootNode->removeChild(this->backNode);
+            bulletBackShader.setUniform("colorPrimary", sf::Glsl::Vec4(color.r * div255, color.g * div255, color.b * div255, color.a * div255));
+            rtBack.clear(color * sf::Color(255, 255, 255, 0));
+            rtBack.draw(circle, &bulletBackShader);
+            textureBack = rtBack.getTexture();
+            spriteBack = sf::Sprite(textureBack);
+            spriteBack.setOrigin(ts * 0.5f, ts * 0.5f);
+            break;
         }
     }
+
+    // tick
+    void tick();
 };
 
 # endif

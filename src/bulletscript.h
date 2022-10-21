@@ -12,7 +12,10 @@ public:
     BulletScript() {}
 
     // returns whether this event is finished
-    virtual bool apply(Bullet& b) {};
+    virtual bool apply(Bullet& b) {
+        printf("something fucked up\n");
+        return true;
+    };
 
     virtual void reset() {};
 };
@@ -92,8 +95,8 @@ public:
     AccelScript(float amount, float cap, bool waitUntilCapHit) : amount(amount), cap(cap), waitUntilCapHit(waitUntilCapHit) {}
 
     bool apply(Bullet& b) override {
-        b.rotAccel = amount;
-        b.rotAccelCap = cap;
+        b.accel = amount;
+        b.accelCap = cap;
         return !waitUntilCapHit || b.speed == b.rotAccelCap;
     }
 };
@@ -161,12 +164,12 @@ public:
     }
 };
 
-class WaitUntilDist : public BulletScript {
+class WaitUntilDistScript : public BulletScript {
 protected:
     float distSqd;
     bool within; // if true, waits until player within dist, else, waits until player outside of dist
 public:
-    WaitUntilDist(float dist, bool within) : distSqd(dist * dist), within(within) {}
+    WaitUntilDistScript(float dist, bool within) : distSqd(dist * dist), within(within) {}
 
     bool apply(Bullet& b) {
         bool outside = (
@@ -177,20 +180,29 @@ public:
     }
 };
 
+class KillScript : public BulletScript {
+public:
+    KillScript() {}
+    bool apply(Bullet& b) {
+        b.kill();
+        return true;
+    }
+};
+
 // a sequential collection of scripts
 class Thread : public BulletScript {
 protected:
-    std::vector<BulletScript> scripts;
+    std::vector<std::shared_ptr<BulletScript>> scripts;
     bool loop; // if true, loops
     int index;
 public:
-    Thread(std::vector<BulletScript> scripts, bool loop) : scripts(scripts), loop(loop), index(0) {}
+    Thread(std::vector<std::shared_ptr<BulletScript>> scripts, bool loop) : scripts(scripts), loop(loop), index(0) {}
 
     bool apply(Bullet& b) override {
         if (index >= scripts.size())
             return true;
         while (true) {
-            if (!scripts[index++].apply(b)) return false;
+            if (!scripts[index++]->apply(b)) return false;
             if (index == scripts.size()) {
                 if (loop)
                     index = 0;
@@ -202,19 +214,19 @@ public:
 
     void reset() override {
         index = 0;
-        for (BulletScript& script : scripts)
-            script.reset();
+        for (std::shared_ptr<BulletScript> script : scripts)
+            script->reset();
     }
 };
 
 // a parallel collection of scripts
 class Bundle : public BulletScript {
 protected:
-    std::vector<BulletScript> scripts;
+    std::vector<std::shared_ptr<BulletScript>> scripts;
     std::vector<bool> active;
     int activeCount;
 public:
-    Bundle(std::vector<BulletScript> scripts) : scripts(scripts), activeCount(0) {
+    Bundle(std::vector<std::shared_ptr<BulletScript>> scripts) : scripts(scripts), activeCount(0) {
         active = std::vector<bool>(scripts.size(), true);
     }
 
@@ -222,7 +234,7 @@ public:
         if (activeCount == scripts.size()) return true;
         for (int i = 0; i < scripts.size(); ++i) {
             if (active[i]) {
-                if (!scripts[i].apply(b)) {
+                if (!scripts[i]->apply(b)) {
                     active[i] = false;
                     activeCount++;
                 }
@@ -234,7 +246,7 @@ public:
     void reset() override {
         activeCount = 0;
         for (int i = 0; i < scripts.size(); ++i) {
-            scripts[i].reset();
+            scripts[i]->reset();
             active[i] = true;
         }
     }
@@ -242,79 +254,85 @@ public:
 
 // bullet script factory
 class BSF {
+public:
     // changes position of bullet
-    static BulletScript move(float x, float y) {
-        return MoveScript(x, y, true);
+    static std::shared_ptr<BulletScript> move(float x, float y) {
+        return std::make_shared<MoveScript>(x, y, true);
     }
 
     // sets position of bullet
-    static BulletScript goTo(float x, float y) {
-        return MoveScript(x, y, false);
+    static std::shared_ptr<BulletScript> goTo(float x, float y) {
+        return std::make_shared<MoveScript>(x, y, false);
     }
 
     // changes direction of bullet
-    static BulletScript turn(float dir) {
-        return DirScript(dir, true);
+    static std::shared_ptr<BulletScript> turn(float dir) {
+        return std::make_shared<DirScript>(dir, true);
     }
 
     // sets direction of bullet
-    static BulletScript dir(float dir) {
-        return DirScript(dir, false);
+    static std::shared_ptr<BulletScript> dir(float dir) {
+        return std::make_shared<DirScript>(dir, false);
     }
 
     // sets color of bullet
-    static BulletScript color(sf::Color color) {
-        return ColorScript(color);
+    static std::shared_ptr<BulletScript> color(sf::Color color) {
+        return std::make_shared<ColorScript>(color);
     }
 
     // changes speed of bullet
-    static BulletScript changeSpeed(float speed) {
-        return SpeedScript(speed, true);
+    static std::shared_ptr<BulletScript> changeSpeed(float speed) {
+        return std::make_shared<SpeedScript>(speed, true);
     }
 
     // sets speed of bullet
-    static BulletScript setSpeed(float speed) {
-        return SpeedScript(speed, false);
+    static std::shared_ptr<BulletScript> setSpeed(float speed) {
+        return std::make_shared<SpeedScript>(speed, false);
     }
 
     // sets acceleration of bullet
-    static BulletScript accel(float amount, float cap, bool waitUntilCapHit) {
-        return AccelScript(amount, cap, waitUntilCapHit);
+    static std::shared_ptr<BulletScript> accel(float amount, float cap, bool waitUntilCapHit) {
+        return std::make_shared<AccelScript>(amount, cap, waitUntilCapHit);
     }
 
     // enables rotation movement (if flag set, rotation origin set to current pos)
-    static BulletScript enableRotate(bool setOriginToPos) {
-        return RotateEnableScript(setOriginToPos);
+    static std::shared_ptr<BulletScript> enableRotate(bool setOriginToPos) {
+        return std::make_shared<RotateEnableScript>(setOriginToPos);
     }
 
     // disables rotation movement (if flag set, velocity maintained)
-    static BulletScript disableRotate(bool keepVelocity) {
-        return RotateDisableScript(keepVelocity);
+    static std::shared_ptr<BulletScript> disableRotate(bool keepVelocity) {
+        return std::make_shared<RotateDisableScript>(keepVelocity);
     }
 
     // waits a set amount of frames
-    static BulletScript wait(unsigned int frames) {
-        return WaitTimeScript(frames);
+    static std::shared_ptr<BulletScript> wait(unsigned int frames) {
+        return std::make_shared<WaitTimeScript>(frames);
     }
 
     // waits until player within a certain range of bullet
-    static BulletScript waitUntilInside(float dist) {
-        return WaitUntilDist(dist, true);
+    static std::shared_ptr<BulletScript> waitUntilInside(float dist) {
+        return std::make_shared<WaitUntilDistScript>(dist, true);
     }
 
     // waits until player outside a certain range of bullet
-    static BulletScript waitUntilOutside(float dist) {
-        return WaitUntilDist(dist, false);
+    static std::shared_ptr<BulletScript> waitUntilOutside(float dist) {
+        return std::make_shared<WaitUntilDistScript>(dist, false);
+    }
+
+    // kills bullet
+    static std::shared_ptr<BulletScript> kill(float dist) {
+        return std::make_shared<KillScript>();
     }
 
     // create thread
-    static BulletScript thread(std::vector<BulletScript> scripts, bool loop) {
-        return Thread(scripts, loop);
+    static std::shared_ptr<BulletScript> thread(std::vector<std::shared_ptr<BulletScript>> scripts, bool loop) {
+        return std::make_shared<Thread>(scripts, loop);
     }
 
     // create bundle
-    static BulletScript bundle(std::vector<BulletScript> scripts) {
-        return Bundle(scripts);
+    static std::shared_ptr<BulletScript> bundle(std::vector<std::shared_ptr<BulletScript>> scripts) {
+        return std::make_shared<Bundle>(scripts);
     }
 };
 

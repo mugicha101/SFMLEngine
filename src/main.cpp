@@ -10,12 +10,14 @@
 #include <filesystem>
 #include <random>
 
+#define _USE_MATH_DEFINES
 #include <cmath>
 
 #include "./input.h"
 #include "./audio.cpp"
 #include "./scenegraph.h"
 #include "./bullets.h"
+#include "./bulletscript.h"
 
 #define DEBUG_TIMER true
 
@@ -113,7 +115,7 @@ int main() {
     };
     
     for (int i = 0; i < 750; ++i)
-        Bullet::create(Bullet::Type::orb, rainbow(i / 750.f), 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 0.5f);
+        Bullet::create(Bullet::Type::orb, rainbow(i / 750.f), 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 0.f, BSF::accel(0.01f,2.f,false));
 
     // create background
     std::shared_ptr<Node> starField = Node::create();
@@ -179,7 +181,7 @@ int main() {
         // update input states
         Input::inputTick();
 
-#if DEBUG_TIMER
+#if DEBUG_TIMER 
         inputTimer.record();
 #endif
 
