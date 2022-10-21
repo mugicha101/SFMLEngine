@@ -13,11 +13,15 @@ public:
 
     // returns whether this event is finished
     virtual bool apply(Bullet& b) {
-        printf("something fucked up\n");
+        throw("bulletscript apply called");
         return true;
     };
 
     virtual void reset() {};
+
+    virtual std::shared_ptr<BulletScript> clone() {
+        return std::make_shared<BulletScript>();
+    };
 };
 
 class MoveScript : public BulletScript {
@@ -26,7 +30,6 @@ protected:
     float y;
     bool relative;
 public:
-    MoveScript(sf::Vector2f pos, bool relative) : x(pos.x), y(pos.y), relative(relative) {}
     MoveScript(float x, float y, bool relative) : x(x), y(y), relative(relative) {}
 
     bool apply(Bullet& b) override {
@@ -38,6 +41,10 @@ public:
             b.y = y;
         }
         return true;
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<MoveScript>(x, y, relative);
     }
 };
 
@@ -55,6 +62,10 @@ public:
             b.dir = val;
         return true;
     }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<DirScript>(val, relative);
+    }
 };
 
 class ColorScript : public BulletScript {
@@ -68,7 +79,13 @@ public:
         b.updateTexture = true;
         return true;
     }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<ColorScript>(color);
+    }
 };
+
+
 
 class SpeedScript : public BulletScript {
 protected:
@@ -84,6 +101,10 @@ public:
             b.speed = amount;
         return true;
     }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<SpeedScript>(amount, relative);
+    }
 };
 
 class AccelScript : public BulletScript {
@@ -97,7 +118,11 @@ public:
     bool apply(Bullet& b) override {
         b.accel = amount;
         b.accelCap = cap;
-        return !waitUntilCapHit || b.speed == b.rotAccelCap;
+        return !waitUntilCapHit || b.speed == b.accelCap;
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<AccelScript>(amount, cap, waitUntilCapHit);
     }
 };
 
@@ -121,10 +146,14 @@ public:
             b.rotDist = 0;
         }
         else {
-            b.rotDist = std::sqrtf(std::pow(b.x - b.rotOrigin.x, 2) + std::pow(b.y - b.rotOrigin.y, 2));
+            b.rotDist = std::sqrt(std::pow(b.x - b.rotOrigin.x, 2) + std::pow(b.y - b.rotOrigin.y, 2));
             b.dir = std::atan2f(b.rotOrigin.y - b.y, b.rotOrigin.x - b.x);
         }
         return true;
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<RotateEnableScript>(setOriginToPos);
     }
 };
 
@@ -146,6 +175,10 @@ public:
         }
         return true;
     }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<RotateDisableScript>(keepVelocity);
+    }
 };
 
 class WaitTimeScript : public BulletScript {
@@ -162,14 +195,19 @@ public:
     void reset() {
         currentFrames = 0;
     }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<WaitTimeScript>(frames);
+    }
 };
 
 class WaitUntilDistScript : public BulletScript {
 protected:
+    float dist; // for cloning
     float distSqd;
     bool within; // if true, waits until player within dist, else, waits until player outside of dist
 public:
-    WaitUntilDistScript(float dist, bool within) : distSqd(dist * dist), within(within) {}
+    WaitUntilDistScript(float dist, bool within) : dist(dist), distSqd(dist * dist), within(within) {}
 
     bool apply(Bullet& b) {
         bool outside = (
@@ -177,6 +215,10 @@ public:
             std::pow(Player::pos.y - b.y, 2)
             ) > distSqd;
         return within ^ outside;
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<WaitUntilDistScript>(dist, within);
     }
 };
 
@@ -186,6 +228,24 @@ public:
     bool apply(Bullet& b) {
         b.kill();
         return true;
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<KillScript>();
+    }
+};
+
+class WaitUntilOffscreenScript : public BulletScript {
+protected:
+    bool inverse;
+public:
+    WaitUntilOffscreenScript(bool inverse) : inverse(inverse) {}
+    bool apply(Bullet& b) {
+        return b.offScreen() ^ inverse;
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<WaitUntilOffscreenScript>(inverse);
     }
 };
 
@@ -202,7 +262,8 @@ public:
         if (index >= scripts.size())
             return true;
         while (true) {
-            if (!scripts[index++]->apply(b)) return false;
+            if (!scripts[index]->apply(b)) return false;
+            index++;
             if (index == scripts.size()) {
                 if (loop)
                     index = 0;
@@ -216,6 +277,14 @@ public:
         index = 0;
         for (std::shared_ptr<BulletScript> script : scripts)
             script->reset();
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        std::vector<std::shared_ptr<BulletScript>> cScripts = scripts;
+        for (std::shared_ptr<BulletScript>& bs : cScripts) {
+            bs = bs->clone();
+        }
+        return std::make_shared<Thread>(cScripts, loop);
     }
 };
 
@@ -249,6 +318,14 @@ public:
             scripts[i]->reset();
             active[i] = true;
         }
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        std::vector<std::shared_ptr<BulletScript>> cScripts = scripts;
+        for (std::shared_ptr<BulletScript>& bs : cScripts) {
+            bs = bs->clone();
+        }
+        return std::make_shared<Bundle>(cScripts);
     }
 };
 
@@ -321,13 +398,28 @@ public:
     }
 
     // kills bullet
-    static std::shared_ptr<BulletScript> kill(float dist) {
+    static std::shared_ptr<BulletScript> kill() {
         return std::make_shared<KillScript>();
     }
 
+    // waits until bullet offscreen
+    static std::shared_ptr<BulletScript> waitUntilOffscreen() {
+        return std::make_shared<WaitUntilOffscreenScript>(false);
+    }
+
+    // waits until bullet onscreen
+    static std::shared_ptr<BulletScript> waitUnilOnscreen() {
+        return std::make_shared <WaitUntilOffscreenScript>(true);
+    }
+
     // create thread
-    static std::shared_ptr<BulletScript> thread(std::vector<std::shared_ptr<BulletScript>> scripts, bool loop) {
-        return std::make_shared<Thread>(scripts, loop);
+    static std::shared_ptr<BulletScript> thread(std::vector<std::shared_ptr<BulletScript>> scripts) {
+        return std::make_shared<Thread>(scripts, false);
+    }
+
+    // create looped thread
+    static std::shared_ptr<BulletScript> threadLoop(std::vector<std::shared_ptr<BulletScript>> scripts) {
+        return std::make_shared<Thread>(scripts, true);
     }
 
     // create bundle

@@ -104,7 +104,7 @@ int main() {
     A->tf.setPosition(300, 300);
 
     sceneGraph.root->addChild(Bullet::rootNode);
-    Bullet::init(window.getSize());
+    Bullet::init(window.getSize(), -window.getSize().x * 0.5f, window.getSize().x * 0.5f, -window.getSize().y * 0.5f, window.getSize().y * 0.5f);
     Bullet::rootNode->tf.setPosition(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
 
     auto rainbow = [](float t) {
@@ -114,8 +114,13 @@ int main() {
         return sf::Color(r, g, b, 255);
     };
     
+    std::shared_ptr<BulletScript> bs = BSF::thread({
+        BSF::accel(0.01f, 2.f, false),
+        BSF::wait(120),
+        BSF::kill()
+        });
     for (int i = 0; i < 750; ++i)
-        Bullet::create(Bullet::Type::orb, rainbow(i / 750.f), 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 0.f, BSF::accel(0.01f,2.f,false));
+        Bullet::create(Bullet::Type::orb, rainbow(i / 750.f), 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 0.f, bs);
 
     // create background
     std::shared_ptr<Node> starField = Node::create();
@@ -200,7 +205,7 @@ int main() {
         // spawn bullets
 
         // move bullets
-        Bullet::moveTick();
+        Bullet::moveTick(calcTick);
 
         // move player
         sf::Vector2f movement;

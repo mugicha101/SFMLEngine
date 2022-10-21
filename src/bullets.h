@@ -155,6 +155,13 @@ private:
     sf::Texture textureBack;
     sf::Sprite spriteFront;
     sf::Sprite spriteBack;
+
+    static float leftX;
+    static float rightX;
+    static float topY;
+    static float bottomY;
+
+    static std::vector<std::shared_ptr<Bullet>> deleteQueue;
 public:
     enum Type {
         orb,
@@ -165,13 +172,18 @@ public:
     static std::shared_ptr<Node> backRootNode;
     static std::vector<std::shared_ptr<Bullet>> bullets;
 
-    static void init(sf::Vector2u windowSize) {
+    static void init(sf::Vector2u windowSize, float leftX, float rightX, float topY, float bottomY) {
         rootNode->addChild(backRootNode);
         rootNode->addChild(frontRootNode);
 
         wSize = windowSize;
         bulletFrontShader.loadFromMemory(VertexShader, BulletFrontGradient);
         bulletBackShader.loadFromMemory(VertexShader, BulletBackGradient);
+
+        Bullet::leftX = leftX;
+        Bullet::rightX = rightX;
+        Bullet::topY = topY;
+        Bullet::bottomY = bottomY;
     }
 
     bool remove;
@@ -193,62 +205,28 @@ public:
     sf::Vector2f rotOrigin;
     float rotDist, rotSpeed, rotAccel, rotAccelCap;
 
-    // TODO: render bullet onto seperate canvas (update only when needed) and render that canvas onto window (saves computation time)
-    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script) {
-        remove = false;
-        alive = true;
-        updateTexture = true;
-        time = 0;
-        this->type = type;
-        this->radius = radius;
-        this->x = x;
-        this->y = y;
-        this->dir = dir;
-        this->speed = speed;
-        accel = 0;
-        accelCap = 0;
-        this->color = color;
-        rotate = false;
-        rotOrigin = { x, y };
-        rotDist = 0;
-        rotSpeed = 0;
-        rotAccel = 0;
-        rotAccelCap = 0;
-        this->script = script;
-        scriptFinished = script == nullptr;
-
-        switch (type) {
-        case orb:
-            circle = sf::CircleShape(BULLET_RENDER_RADIUS * 2);
-            circle.setOrigin(circle.getRadius(), circle.getRadius());
-            circle.setPosition(circle.getRadius(), circle.getRadius());
-            circle.setFillColor(sf::Color::Transparent);
-
-            this->frontNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-                renderTarget.draw(spriteFront, trans);
-                });
-            this->backNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-                renderTarget.draw(spriteBack, trans);
-                });
-            break;
-        }
-        frontRootNode->addChild((std::shared_ptr<Node>)this->frontNode);
-        backRootNode->addChild((std::shared_ptr<Node>)this->backNode);
-    }
+    // constructor
+    Bullet();
+    Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script);
 
     // create bullet and put into bullets list
     static std::shared_ptr<Bullet> create(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script);
 
     // run move tick for all bullets
-    static void moveTick() {
+    static void moveTick(int calcTick) {
         // move bullets
         for (std::shared_ptr<Bullet> b : bullets)
             b->tick();
 
         // remove dead bullets
-        bullets.erase(std::remove_if(bullets.begin(), bullets.end(), [](const std::shared_ptr<Bullet> &b) {
+        auto it = std::remove_if(bullets.begin(), bullets.end(), [](const std::shared_ptr<Bullet>& b) {
             return b->remove;
-            }), bullets.end());
+            });
+        deleteQueue.insert(deleteQueue.begin(), it, bullets.end());
+        bullets.erase(it, bullets.end());
+
+        // update dead bullet queue
+        if ((calcTick & 0b10) && deleteQueue.size() > 0) deleteQueue.pop_back();
     }
 
     void kill() {
@@ -299,6 +277,12 @@ public:
 
     // tick
     void tick();
+
+    // returns true iff bullet off screen
+    bool offScreen() {
+        float r = radius * 2;
+        return x < leftX - r || x > rightX + r || y < topY - r || y > bottomY + r;
+    }
 };
 
 # endif
