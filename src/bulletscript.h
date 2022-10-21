@@ -209,7 +209,7 @@ protected:
 public:
     WaitUntilDistScript(float dist, bool within) : dist(dist), distSqd(dist * dist), within(within) {}
 
-    bool apply(Bullet& b) {
+    bool apply(Bullet& b) override {
         bool outside = (
             std::pow(Player::pos.x - b.x, 2) +
             std::pow(Player::pos.y - b.y, 2)
@@ -225,7 +225,7 @@ public:
 class KillScript : public BulletScript {
 public:
     KillScript() {}
-    bool apply(Bullet& b) {
+    bool apply(Bullet& b) override {
         b.kill();
         return true;
     }
@@ -240,12 +240,27 @@ protected:
     bool inverse;
 public:
     WaitUntilOffscreenScript(bool inverse) : inverse(inverse) {}
-    bool apply(Bullet& b) {
+    bool apply(Bullet& b) override {
         return b.offScreen() ^ inverse;
     }
 
     std::shared_ptr<BulletScript> clone() override {
         return std::make_shared<WaitUntilOffscreenScript>(inverse);
+    }
+};
+
+class GenericScript : public BulletScript {
+protected:
+    std::function<bool(Bullet&)> applyFunction;
+public:
+    GenericScript(std::function<bool(Bullet&)> applyFunction) : applyFunction(applyFunction) {}
+
+    bool apply(Bullet& b) override {
+        return applyFunction(b);
+    }
+
+    std::shared_ptr<BulletScript> clone() override {
+        return std::make_shared<GenericScript>(applyFunction);
     }
 };
 
@@ -408,8 +423,13 @@ public:
     }
 
     // waits until bullet onscreen
-    static std::shared_ptr<BulletScript> waitUnilOnscreen() {
-        return std::make_shared <WaitUntilOffscreenScript>(true);
+    static std::shared_ptr<BulletScript> waitUntilOnscreen() {
+        return std::make_shared<WaitUntilOffscreenScript>(true);
+    }
+
+    // create generic script
+    static std::shared_ptr<BulletScript> script(std::function<bool(Bullet&)> applyFunction) {
+        return std::make_shared<GenericScript>(applyFunction);
     }
 
     // create thread
