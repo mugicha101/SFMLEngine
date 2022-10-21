@@ -140,8 +140,8 @@ public:
         if (keepVelocity) { // preserve direction of current movement from rotation
             float dist = b.rotDist + b.speed;
             float dir = b.dir + b.rotSpeed;
-            float dx = std::cosf(dir) * dist - b.x;
-            float dy = std::sinf(dir) * dist - b.y;
+            float dx = std::cos(dir) * dist - b.x;
+            float dy = std::sin(dir) * dist - b.y;
             b.dir = std::atan2f(dy,dx);
         }
         return true;

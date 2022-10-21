@@ -108,9 +108,9 @@ int main() {
     Bullet::rootNode->tf.setPosition(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
 
     auto rainbow = [](float t) {
-        int r = std::round(255 * std::sinf(t * 2.f * M_PI));
-        int g = std::round(255 * std::sinf((t + 1.f / 3.f) * 2.f * M_PI));
-        int b = std::round(255 * std::sinf((t + 2.f / 3.f) * 2.f * M_PI));
+        int r = std::round(255 * std::sin(t * 2.f * M_PI));
+        int g = std::round(255 * std::sin((t + 1.f / 3.f) * 2.f * M_PI));
+        int b = std::round(255 * std::sin((t + 2.f / 3.f) * 2.f * M_PI));
         return sf::Color(r, g, b, 255);
     };
     
