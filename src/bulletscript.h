@@ -163,7 +163,7 @@ protected:
 public:
     RotateDisableScript(bool keepVelocity) : keepVelocity(keepVelocity) {}
 
-    bool apply(Bullet& b) {
+    bool apply(Bullet& b) override {
         if (b.rotate == false) return 0;
         b.rotate = false;
         if (keepVelocity) { // preserve direction of current movement from rotation
@@ -188,7 +188,7 @@ protected:
 public:
     WaitTimeScript(unsigned int frames) : frames(frames), currentFrames(0) {}
 
-    bool apply(Bullet& b) {
+    bool apply(Bullet& b) override {
         return currentFrames++ >= frames;
     }
 
