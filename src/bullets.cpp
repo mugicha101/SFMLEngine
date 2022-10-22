@@ -10,18 +10,23 @@ std::shared_ptr<Node> Bullet::frontRootNode = std::make_shared<Node>();
 std::shared_ptr<Node> Bullet::backRootNode = std::make_shared<Node>();
 
 std::vector<std::shared_ptr<Bullet>> Bullet::bullets = std::vector<std::shared_ptr<Bullet>>();
+# if USE_SHADER
 std::vector<std::shared_ptr<Bullet>> Bullet::deleteQueue = std::vector<std::shared_ptr<Bullet>>();
+# endif
 
 std::shared_ptr<Bullet> Bullet::create(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script) {
     Bullet::bullets.push_back(std::make_shared<Bullet>(type, color, radius, x, y, dir, speed, script));
     return Bullet::bullets.back();
 }
 
+# if USE_SHADER
 sf::Shader Bullet::bulletFrontShader = sf::Shader();
 sf::Shader Bullet::bulletBackShader = sf::Shader();
+# endif
 
-const int Bullet::BULLET_RENDER_RADIUS = 32; // (set to power of 2)
-const float Bullet::COLLISION_DIST_SQD = 20 * 20;
+const int Bullet::BULLET_RENDER_RADIUS = 32; // (set to power of 2 if shader on)
+
+const float Bullet::COLLISION_DIST_SQD = 5 * 5;
 const int Bullet::BULLET_DEATH_TIME = 15;
 
 Bullet::Bullet(Type type, sf::Color color, float radius, float x, float y, float dir, float speed, std::shared_ptr<BulletScript> script) {
@@ -47,13 +52,13 @@ Bullet::Bullet(Type type, sf::Color color, float radius, float x, float y, float
     this->script = script;
     scriptFinished = script == nullptr;
 
+# if USE_SHADER
     switch (type) {
     case orb:
         circle = sf::CircleShape(BULLET_RENDER_RADIUS * 2);
         circle.setOrigin(circle.getRadius(), circle.getRadius());
         circle.setPosition(circle.getRadius(), circle.getRadius());
         circle.setFillColor(sf::Color::Transparent);
-
         this->frontNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
             renderTarget.draw(spriteFront, trans);
             });
@@ -62,9 +67,21 @@ Bullet::Bullet(Type type, sf::Color color, float radius, float x, float y, float
             });
         break;
     }
+# else
+    this->frontNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
+
+        for (sf::CircleShape circle : frontCircles)
+            renderTarget.draw(circle, trans);
+    });
+    this->backNode = std::make_shared<DrawableNode>([this](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
+        for (sf::CircleShape circle : backCircles)
+            renderTarget.draw(circle, trans);
+    });
+# endif
     frontRootNode->addChild((std::shared_ptr<Node>)this->frontNode);
     backRootNode->addChild((std::shared_ptr<Node>)this->backNode);
 }
+
 Bullet::Bullet() : Bullet::Bullet(Type::orb, sf::Color::White, 0, 0, 0, 0, 0, nullptr) {}
 
 void Bullet::tick() {
@@ -97,7 +114,7 @@ void Bullet::tick() {
     // update texture
     if (updateTexture) {
         updateTexture = false;
-        createTexture();
+        renderUpdate();
     }
 
     // update draw 

@@ -5,6 +5,7 @@
 
 struct Player {
     static sf::Vector2f pos;
+    static float charge;
 };
 
 # endif

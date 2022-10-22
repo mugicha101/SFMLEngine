@@ -71,37 +71,39 @@ int main() {
 
     // setup scene
     SceneGraph sceneGraph(window);
-    sf::CircleShape circleA(100.0f);
-    circleA.setFillColor(sf::Color::Green);
-    std::shared_ptr<Node> A = DrawableNode::create([&circleA](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-        renderTarget.draw(circleA, trans);
+
+    std::shared_ptr<DrawableNode> playerSprite = DrawableNode::create();
+    std::shared_ptr<ArraySprite> playerBase = ArraySprite::create({ "resources/graphics/NuvenMove.png", "resources/graphics/NuvenCharge.png" });
+    std::shared_ptr<ArraySprite> playerExtra = ArraySprite::create({ "resources/graphics/NuvenConstructOff.png", "resources/graphics/NuvenConstructOn.png" });
+    sf::CircleShape orb;
+    orb.setFillColor(sf::Color::White);
+    
+    std::shared_ptr<DrawableNode> playerOrb = DrawableNode::create([&orb](sf::RenderTarget& renderTarget, sf::Transform& trans, int ticks) {
+        float radius = Player::charge * 20.f * (1 + 0.1f * std::sin(ticks * M_PI / 3.f));
+        orb.setOutlineColor(Player::charge == 1? sf::Color::Red : sf::Color::Yellow);
+        if (Input::isPressed("charge")) {
+            orb.setRadius(radius * 0.75f);
+            orb.setOutlineThickness(radius * 0.25f);
+            orb.setOrigin(orb.getRadius(), orb.getRadius());
+            orb.setPosition(0, -40);
+            renderTarget.draw(orb, trans);
+        } else {
+            orb.setRadius(radius * 0.375f);
+            orb.setOutlineThickness(radius * 0.125f);
+            orb.setOrigin(orb.getRadius(), orb.getRadius());
+            orb.setPosition(-12, 11);
+            renderTarget.draw(orb, trans);
+            orb.setPosition(12, 11);
+            renderTarget.draw(orb, trans);
+        }
         });
-    A->tf.setOrigin(circleA.getRadius(), circleA.getRadius());
-    sf::CircleShape circleB(50.0f);
-    std::shared_ptr<Node> B1 = DrawableNode::create([&circleB](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-        renderTarget.draw(circleB, trans);
-        });
-    B1->tf.setOrigin(circleB.getRadius(), circleB.getRadius());
-    std::shared_ptr<Node> B2 = DrawableNode::create([&circleB](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-        renderTarget.draw(circleB, trans);
-        });
-    B2->tf.setOrigin(circleB.getRadius(), circleB.getRadius());
-    std::shared_ptr<Node> B3 = DrawableNode::create([&circleB](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-        renderTarget.draw(circleB, trans);
-        });
-    B3->tf.setOrigin(circleB.getRadius(), circleB.getRadius());
-    B3->tf.setPosition(circleA.getRadius(), circleA.getRadius());
-    std::shared_ptr<Node> B4 = DrawableNode::create([&circleB](sf::RenderTarget& renderTarget, sf::Transform trans, int calcTick) {
-        renderTarget.draw(circleB, trans);
-        });
-    B4->tf.setOrigin(circleB.getRadius(), circleB.getRadius());
-    B4->tf.setPosition(circleA.getRadius()*2, circleA.getRadius()*2);
-    sceneGraph.root->addChild(A);
-    A->addChild(B1);
-    A->addChild(B2);
-    A->addChild(B3);
-    A->addChild(B4);
-    A->tf.setPosition(300, 300);
+    playerBase->tf.setOrigin(32, 36);
+    playerExtra->tf.setOrigin(32, 36);
+    sceneGraph.root->addChild(playerSprite);
+    playerSprite->addChild(playerExtra);
+    playerSprite->addChild(playerOrb);
+    playerSprite->addChild(playerBase);
+    playerSprite->tf.setScale(2.0f, 2.0f);
 
     sceneGraph.root->addChild(Bullet::rootNode);
     Bullet::init(window.getSize(), window.getSize().x * -0.5f, window.getSize().x * 0.5f, window.getSize().y * -0.5f, window.getSize().y * 0.5f);
@@ -122,7 +124,6 @@ int main() {
     std::unordered_map<std::string, SoundEffect> sounds;
 
     SoundEffect s("resources/audio/sound/seUseSpellCard.wav");
-    s.play();
 
     MusicTrack m("resources/audio/music/IntoTheAbyssStart.ogg", "resources/audio/music/IntoTheAbyssLoop.ogg");
     m.play();
@@ -136,6 +137,8 @@ int main() {
     Input::mapInput(sf::Keyboard::Left, "left");
     Input::mapInput(sf::Keyboard::Down, "down");
     Input::mapInput(sf::Keyboard::Right, "right");
+    Input::mapInput(sf::Keyboard::Space, "charge");
+    Input::mapInput(sf::Keyboard::LShift, "charge");
 
     // setup timing
 #if DEBUG_TIMER
@@ -196,12 +199,12 @@ int main() {
 
         // spawn bullets
         std::shared_ptr<BulletScript> bs = BSF::thread({
-        BSF::accel(0.1f, 10.f, false),
+        BSF::accel(-0.1f, 3.f , false),
         BSF::waitUntilOffscreen(),
         BSF::kill()
             });
-        for (int i = 0; i < 1; ++i)
-            Bullet::create(Bullet::Type::orb, rainbow(calcTick / 750.f), 15, rand() % window.getSize().x - window.getSize().x * 0.5f, rand() % window.getSize().y - window.getSize().y * 0.5f, randDir(), 0.f, bs);
+        for (int i = 0; i < 2; ++i)
+            Bullet::create(Bullet::Type::orb, rainbow(calcTick / 750.f), 15, 0, -200, randDir(), 5.f, bs);
 
 
         // move bullets
@@ -209,7 +212,8 @@ int main() {
 
         // move player
         sf::Vector2f movement;
-        float speed = 2.0f;
+        float speed = Input::isPressed("charge") ? 2.f : 6.f;
+        float tilt = Input::isPressed("charge") ? 0 : 15;
         if (Input::isPressed("up"))
             movement.y -= 1;
         if (Input::isPressed("down"))
@@ -219,9 +223,30 @@ int main() {
         if (Input::isPressed("right"))
             movement.x += 1;
         Player::pos += movement * speed;
-        A->tf.setPosition(Player::pos + sf::Vector2f(window.getSize().x * 0.5f, window.getSize().y * 0.5f));
-        B1->tf.move(movement * speed);
-        A->tf.setScale(0.5f + movement.x * movement.x, 0.5f + movement.y * movement.y);
+        playerBase->tf.setRotation(tilt * movement.x);
+        static sf::Vector2f offset = sf::Vector2f(window.getSize().x * 0.5f, window.getSize().y * 0.5f);
+        playerSprite->tf.setPosition(Player::pos + offset);
+        playerBase->setIndex(Input::isPressed("charge") ? 1 : 0);
+        bool on = Player::charge == 1.f || sin(calcTick * (M_PI/12)) + 1 < Player::charge * 2;
+        playerExtra->setIndex((int)on);
+        playerExtra->tf.setScale(0.25f + 1.25f * Player::charge, 1.5f);
+
+        // charge
+        if (Input::justReleased("charge") && Player::charge == 1) {
+            s.play();
+            Player::charge = 0;
+        }
+        if (Input::isPressed("charge")) {
+            static float chargeAmount = 1.f / 600.f;
+            Player::charge += chargeAmount;
+            if (Player::charge >= 1.f) Player::charge = 1.f;
+        }
+        else {
+            static float releaseAmount = 1.f / 200.f;
+            Player::charge -= releaseAmount;
+            if (Player::charge < 0.f)
+                Player::charge = 0;
+        }
 
 #if DEBUG_TIMER
         calcTimer.record();

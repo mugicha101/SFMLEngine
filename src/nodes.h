@@ -115,6 +115,10 @@ public:
         loadTexture(texture, path);
         sprite.setTexture(texture);
     }
+
+    static std::shared_ptr<StaticSprite> create(std::string path) {
+        return std::make_shared<StaticSprite>(path);
+    }
 };
 
 // node with multiple images associated with indexes
@@ -125,7 +129,7 @@ protected:
     IndexedSprite() : index(0) {}
 
     // update sprite to match index
-    virtual void updateSprite();
+    virtual void updateSprite() {}
 public:
     void setIndex(int index) {
         this->index = index;
@@ -133,7 +137,7 @@ public:
     int getIndex() {
         return index;
     }
-    virtual int size(); // returns size of indexed collection of textures
+    virtual int size() { return 0; } // returns size of indexed collection of textures
 
     virtual void draw(sf::RenderTarget& target, const sf::Transform& parentTrans, int calcTick) override {
         updateSprite();
@@ -150,12 +154,19 @@ protected:
         sprite.setTexture(textures[index]);
     }
 public:
-    ArraySprite(std::vector<sf::Texture> textures) : IndexedSprite() {
-        std::swap(this->textures, textures);
+    ArraySprite(std::vector<std::string> paths) : IndexedSprite() {
+        textures = std::vector<sf::Texture>(paths.size());
+        for (int i = 0; i < paths.size(); ++i)
+            loadTexture(textures[i], paths[i]);
+        if (paths.size() != 0) sprite.setTexture(textures[0]);
     }
 
     int size() override {
         return textures.size();
+    }
+
+    static std::shared_ptr<ArraySprite> create(std::vector<std::string> paths) {
+        return std::make_shared<ArraySprite>(paths);
     }
 };
 
@@ -180,6 +191,10 @@ public:
 
     void setIndex(int row, int col) {
         IndexedSprite::setIndex(row * cols + col);
+    }
+
+    static std::shared_ptr<SheetSprite> create(std::string spriteSheetPath, int rows, int cols, int imgWidth, int imgHeight) {
+        return std::make_shared<SheetSprite>(spriteSheetPath, rows, cols, imgWidth, imgHeight);
     }
 };
 
@@ -215,6 +230,14 @@ public:
             break;
         }
         ObjectSprite::draw(target, parentTrans, calcTick);
+    }
+
+    static std::shared_ptr<AnimatedSprite> create(IndexedSprite sprite, int frameDelay, LoopType loopType) {
+        return std::make_shared<AnimatedSprite>(sprite, frameDelay, loopType);
+    }
+
+    static std::shared_ptr<AnimatedSprite> create(IndexedSprite sprite, int frameDelay) {
+        return std::make_shared<AnimatedSprite>(sprite, frameDelay);
     }
 };
 
