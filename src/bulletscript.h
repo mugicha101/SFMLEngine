@@ -147,7 +147,7 @@ public:
         }
         else {
             b.rotDist = std::sqrt(std::pow(b.x - b.rotOrigin.x, 2) + std::pow(b.y - b.rotOrigin.y, 2));
-            b.dir = std::atan2f(b.rotOrigin.y - b.y, b.rotOrigin.x - b.x);
+            b.dir = std::atan2(b.rotOrigin.y - b.y, b.rotOrigin.x - b.x);
         }
         return true;
     }
@@ -171,7 +171,7 @@ public:
             float dir = b.dir + b.rotSpeed;
             float dx = std::cos(dir) * dist - b.x;
             float dy = std::sin(dir) * dist - b.y;
-            b.dir = std::atan2f(dy,dx);
+            b.dir = std::atan2(dy,dx);
         }
         return true;
     }
@@ -192,7 +192,7 @@ public:
         return currentFrames++ >= frames;
     }
 
-    void reset() {
+    void reset() override {
         currentFrames = 0;
     }
 
